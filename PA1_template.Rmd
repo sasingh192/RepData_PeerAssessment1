@@ -5,21 +5,82 @@ output:
     keep_md: true
 ---
 
+# Peer-graded Assignment: Course Project 1
 
-## Loading and preprocessing the data
+```{r loadlibraries, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(knitr)
+```
 
+## Code to set the global options
+```{r setoptions}
+opts_chunk$set(echo=TRUE, results = "asis")
+```
+
+## Code for reading in the dataset and/or processing the data
+```{r readdata}
+if(!file.exists("activity.csv")) {unzip("activity.zip")}
+df_activity <- read.csv("activity.csv")
+df_activity <- transform(df_activity, date = as.Date(date))
+
+```
 
 
 ## What is mean total number of steps taken per day?
+```{r stepsperday}
+df_activity_daily_agg <- df_activity %>% group_by(date) %>% 
+        summarise(total=sum(steps, na.rm=TRUE), mean=mean(steps, na.rm=TRUE), median = median(steps, na.rm = TRUE))
+g <- ggplot(df_activity_daily_agg, aes(x=total))
+g + geom_histogram(binwidth = 2000)
+```
+
+## Mean and median number of the steps taken each day
+```{r}
+par(mfrow = c(1,2))
+with(df_activity_daily_agg, plot(date, mean, ylab = "Steps per day (Mean)"))
+title(main="Average steps per day")
+with(df_activity_daily_agg, plot(date, median, ylab = "Steps per day (Median)"))
+title(main="Median steps per day")
+```
+
+## Time series plot of the average number of steps taken
+```{r timeseries1}
+par(mfrow = c(1,1))
+df_activity_5min_agg <- df_activity %>% group_by(interval) %>% 
+        summarise(total=sum(steps, na.rm=TRUE), Average = mean(steps, na.rm = TRUE))
+with(df_activity_5min_agg, plot(interval, Average, type='l'))
+```
+
+## The 5-minute interval that, on average, contains the maximum number of steps
+```{r maxstepint}
+index <- which(df_activity_5min_agg$Average == max(df_activity_5min_agg$Average))
+interval_max <- df_activity_5min_agg[index, ]$interval
+```
+The five-minute interval that, on average, contains the maximum number of steps is: `r interval_max`
+
+## Code to describe and show a strategy for imputing missing data
+```{r imputation}
+df_impute <- df_activity %>% group_by(interval) %>% 
+        mutate(steps = ifelse(is.na(steps), mean(steps, na.rm = TRUE), steps)) %>% ungroup()
+```
 
 
+## Histogram of the total number of steps taken each day after missing values are imputed
+```{r imputehist}
+df_impute_agg <- df_impute %>% group_by(date) %>% 
+        summarise(total=sum(steps, na.rm=TRUE), mean=mean(steps, na.rm=TRUE), median = median(steps, na.rm = TRUE))
 
-## What is the average daily activity pattern?
+g <- ggplot(df_impute_agg, aes(x=total))
+g + geom_histogram(binwidth = 2000)
+```
 
+## Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+```{r weekactivity}
+df_impute_wd <- df_impute %>% mutate(day = weekdays(date)) %>%
+        mutate(weekend = ifelse(day %in% c("Saturday", "Sunday"), "weekend", "weekday"))
 
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+g <- ggplot(df_impute_wd, aes(interval, steps))
+g+geom_line(stat = "summary",fun.y="mean", lwd=1)+facet_wrap(~weekend)+
+        labs(y="Average number of steps taken")
+```
